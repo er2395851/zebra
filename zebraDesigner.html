@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    
+    <!-- Add these scripts in this order -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui-touch-punch/0.2.3/jquery.ui.touch-punch.min.js"></script>
+
+    <meta charset="UTF-8">
+    <title>ZPL Label Designer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+        .controls {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+        }
+      
+        .form-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+   .element {
+       position: absolute;
+       cursor: move;
+       padding: 5px;
+       border: 1px dashed #999;
+       background: rgba(255,255,255,0.8);
+       user-select: none;
+       -webkit-user-select: none; /* Safari */
+       -moz-user-select: none; /* Firefox */
+       -ms-user-select: none; /* IE10+/Edge */
+       touch-action: none;
+       -webkit-touch-callout: none; /* iOS Safari */
+   }
+   
+   .preview-area {
+       border: 1px solid #ccc;
+       background: white;
+       position: relative;
+       height: 600px;
+       overflow: hidden;
+       touch-action: none;
+       -webkit-touch-callout: none;
+   }
+   
+      .element.selected {
+          border: 2px solid #007bff;
+          z-index: 1000;
+      }
+      
+        .button-group {
+            margin-top: 10px;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #zplOutput {
+            width: 100%;
+            height: 100px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <h2>Label Elements</h2>
+            <button onclick="addElement('text')">Add Text</button>
+            <button onclick="addElement('aztec')">Add Aztec Code</button>
+
+            <div id="elementProperties" style="display: none;">
+                <h3>Element Properties</h3>
+                <div class="form-group">
+                    <label>Content:</label>
+                    <input type="text" id="elementContent" onchange="updateSelectedElement()">
+                </div>
+
+                <div class="form-group">
+                    <label>X Position:</label>
+                    <input type="number" id="elementX" onchange="updateSelectedElement()">
+                </div>
+
+                <div class="form-group">
+                    <label>Y Position:</label>
+                    <input type="number" id="elementY" onchange="updateSelectedElement()">
+                </div>
+
+                <div id="textProperties" style="display: none;">
+                    <div class="form-group">
+                        <label>Font Size:</label>
+                        <input type="number" id="fontSize" value="30" onchange="updateSelectedElement()">
+                    </div>
+                </div>
+
+                <div id="aztecProperties" style="display: none;">
+                    <div class="form-group">
+                        <label>Size:</label>
+                        <input type="number" id="aztecSize" value="30" onchange="updateSelectedElement()">
+                    </div>
+                    <div class="form-group">
+                        <label>Error Correction (%):</label>
+                        <input type="number" id="aztecCorrection" value="23" min="1" max="99" onchange="updateSelectedElement()">
+                    </div>
+                    <div class="form-group">
+                        <label>Show Text:</label>
+                        <select id="aztecShowText" onchange="updateSelectedElement()">
+                            <option value="Y">Yes</option>
+                            <option value="N">No</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="deleteSelectedElement()">Delete Element</button>
+            </div>
+
+            <div class="form-group">
+                <label>Label Width (dots):</label>
+                <input type="number" id="labelWidth" value="800" onchange="updateLabelSize()">
+            </div>
+
+            <div class="form-group">
+                <label>Label Height (dots):</label>
+                <input type="number" id="labelHeight" value="600" onchange="updateLabelSize()">
+            </div>
+
+            <button onclick="generateZPL()">Generate ZPL</button>
+            <textarea id="zplOutput" readonly></textarea>
+            
+            <div class="form-group">
+                <label>File Name:</label>
+                <input type="text" id="fileName" placeholder="Enter file name or leave blank for auto-name">
+                <button onclick="saveZPL()">Save ZPL</button>
+            </div>
+        </div>
+
+        <div class="preview-area" id="previewArea"></div>
+    </div>
+
+    <script>
+        let elements = [];
+        let selectedElement = null;
+        let draggedElement = null;
+        let dragOffset = { x: 0, y: 0 };
+        
+
+        function addElement(type) {
+            const element = {
+                type: type,
+                content: type === 'text' ? 'New Text' : '12345',
+                x: 50,
+                y: 50,
+                fontSize: 30,
+                aztecSize: 30,
+                aztecCorrection: 23,
+                aztecShowText: 'Y'
+            };
+            elements.push(element);
+            renderElements();
+            selectElement(element);
+        }
+
+    function renderElements() {
+        const previewArea = document.getElementById('previewArea');
+        previewArea.innerHTML = '';
+        elements.forEach(element => {
+            const div = document.createElement('div');
+            div.className = 'element';
+            if (element === selectedElement) {
+                div.className += ' selected';
+            }
+            div.style.left = element.x + 'px';
+            div.style.top = element.y + 'px';
+            
+            if (element.type === 'text') {
+                div.style.fontSize = element.fontSize + 'px';
+                div.textContent = element.content;
+            } else {
+                div.style.border = '2px solid black';
+                div.style.padding = '10px';
+                div.textContent = `Aztec: ${element.content}`;
+            }
+    
+            previewArea.appendChild(div);
+    
+            // Make element draggable using jQuery UI
+            $(div).draggable({
+                containment: "parent",
+                start: function(event, ui) {
+                    selectElement(element);
+                },
+                drag: function(event, ui) {
+                    element.x = ui.position.left;
+                    element.y = ui.position.top;
+                    document.getElementById('elementX').value = Math.round(ui.position.left);
+                    document.getElementById('elementY').value = Math.round(ui.position.top);
+                },
+                stop: function(event, ui) {
+                    element.x = ui.position.left;
+                    element.y = ui.position.top;
+                    document.getElementById('elementX').value = Math.round(ui.position.left);
+                    document.getElementById('elementY').value = Math.round(ui.position.top);
+                }
+            });
+    
+            // Add click/touch handler for selection
+            $(div).on('mousedown touchstart', function(e) {
+                selectElement(element);
+            });
+        });
+    }
+    
+    
+
+        function selectElement(element) {
+            selectedElement = element;
+            const properties = document.getElementById('elementProperties');
+            const textProps = document.getElementById('textProperties');
+            const aztecProps = document.getElementById('aztecProperties');
+            
+            properties.style.display = 'block';
+            document.getElementById('elementContent').value = element.content;
+            document.getElementById('elementX').value = element.x;
+            document.getElementById('elementY').value = element.y;
+
+            if (element.type === 'text') {
+                textProps.style.display = 'block';
+                aztecProps.style.display = 'none';
+                document.getElementById('fontSize').value = element.fontSize;
+            } else {
+                textProps.style.display = 'none';
+                aztecProps.style.display = 'block';
+                document.getElementById('aztecSize').value = element.aztecSize;
+                document.getElementById('aztecCorrection').value = element.aztecCorrection;
+                document.getElementById('aztecShowText').value = element.aztecShowText;
+            }
+
+            renderElements();
+        }
+
+        function updateSelectedElement() {
+            if (!selectedElement) return;
+
+            selectedElement.content = document.getElementById('elementContent').value;
+            selectedElement.x = parseInt(document.getElementById('elementX').value);
+            selectedElement.y = parseInt(document.getElementById('elementY').value);
+
+            if (selectedElement.type === 'text') {
+                selectedElement.fontSize = parseInt(document.getElementById('fontSize').value);
+            } else {
+                selectedElement.aztecSize = parseInt(document.getElementById('aztecSize').value);
+                selectedElement.aztecCorrection = parseInt(document.getElementById('aztecCorrection').value);
+                selectedElement.aztecShowText = document.getElementById('aztecShowText').value;
+            }
+
+            renderElements();
+        }
+
+        function deleteSelectedElement() {
+            if (selectedElement) {
+                elements = elements.filter(e => e !== selectedElement);
+                selectedElement = null;
+                document.getElementById('elementProperties').style.display = 'none';
+                renderElements();
+            }
+        }
+
+        function updateLabelSize() {
+            const width = document.getElementById('labelWidth').value;
+            const height = document.getElementById('labelHeight').value;
+            const previewArea = document.getElementById('previewArea');
+            previewArea.style.width = width + 'px';
+            previewArea.style.height = height + 'px';
+        }
+
+        function generateZPL() {
+            let zpl = '^XA\n';
+            
+            elements.forEach(element => {
+                zpl += `^FO${element.x},${element.y}\n`;
+                
+                if (element.type === 'text') {
+                    zpl += `^A0N,${element.fontSize},${element.fontSize}\n`;
+                    zpl += `^FD${element.content}^FS\n`;
+                } else {
+                    zpl += `^B0N,${element.aztecSize},${element.aztecCorrection},N,${element.aztecShowText}\n`;
+                    zpl += `^FD${element.content}^FS\n`;
+                }
+            });
+            
+            zpl += '^XZ';
+            document.getElementById('zplOutput').value = zpl;
+        }
+
+        function saveZPL() {
+            const zpl = document.getElementById('zplOutput').value;
+            if (!zpl) {
+                alert('Please generate ZPL first!');
+                return;
+            }
+
+            let fileName = document.getElementById('fileName').value.trim();
+            if (!fileName) {
+                fileName = 'label_' + new Date().getTime();
+            }
+            if (!fileName.toLowerCase().endsWith('.zpl')) {
+                fileName += '.zpl';
+            }
+
+            const blob = new Blob([zpl], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+       // Drag and drop functionality
+       document.addEventListener('mousemove', (e) => {
+           if (draggedElement) {
+               e.preventDefault(); // Prevent unwanted selections
+               const previewArea = document.getElementById('previewArea');
+               const rect = previewArea.getBoundingClientRect();
+               
+               // Calculate new position
+               let newX = e.clientX - rect.left - dragOffset.x;
+               let newY = e.clientY - rect.top - dragOffset.y;
+               
+               // Add bounds checking to keep elements within preview area
+               const previewWidth = previewArea.offsetWidth;
+               const previewHeight = previewArea.offsetHeight;
+               
+               // Limit x position
+               newX = Math.max(0, Math.min(newX, previewWidth - 50));
+               // Limit y position
+               newY = Math.max(0, Math.min(newY, previewHeight - 50));
+               
+               draggedElement.x = newX;
+               draggedElement.y = newY;
+               
+               // Update input fields
+               document.getElementById('elementX').value = Math.round(newX);
+               document.getElementById('elementY').value = Math.round(newY);
+               
+               renderElements();
+           }
+       });
+       
+       document.addEventListener('mouseup', () => {
+           if (draggedElement) {
+               draggedElement = null;
+           }
+       });
+       
+       // Add touch support
+       document.addEventListener('touchmove', (e) => {
+           if (draggedElement) {
+               e.preventDefault();
+               const touch = e.touches[0];
+               const previewArea = document.getElementById('previewArea');
+               const rect = previewArea.getBoundingClientRect();
+               
+               let newX = touch.clientX - rect.left - dragOffset.x;
+               let newY = touch.clientY - rect.top - dragOffset.y;
+               
+               // Add bounds checking
+               const previewWidth = previewArea.offsetWidth;
+               const previewHeight = previewArea.offsetHeight;
+               
+               newX = Math.max(0, Math.min(newX, previewWidth - 50));
+               newY = Math.max(0, Math.min(newY, previewHeight - 50));
+               
+               draggedElement.x = newX;
+               draggedElement.y = newY;
+               
+               document.getElementById('elementX').value = Math.round(newX);
+               document.getElementById('elementY').value = Math.round(newY);
+               
+               renderElements();
+           }
+       });
+       
+       document.addEventListener('touchend', () => {
+           if (draggedElement) {
+               draggedElement = null;
+           }
+       });
+       
+
+        // Initialize
+        updateLabelSize();
+    </script>
+</body>
+</html>
