@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZPL Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        select, input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        #output {
+            width: 100%;
+            height: 200px;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+        }
+        .button-group {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        #textOptions {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>ZPL Code Generator</h1>
+    
+    <div class="form-group">
+        <label for="contentType">Content Type:</label>
+        <select id="contentType" onchange="toggleOptions()">
+            <option value="barcode">Barcode</option>
+            <option value="text">Text Only</option>
+        </select>
+    </div>
+
+    <div id="barcodeOptions">
+        <div class="form-group">
+            <label for="barcodeType">Barcode Type:</label>
+            <select id="barcodeType">
+                <option value="aztec">Aztec Code</option>
+                <option value="code128">Code 128</option>
+                <option value="datamatrix">Data Matrix</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="height">Height (in dots):</label>
+            <input type="number" id="height" value="100">
+        </div>
+
+        <div class="form-group">
+            <label for="width">Width (in dots):</label>
+            <input type="number" id="width" value="100">
+        </div>
+    </div>
+
+    <div id="textOptions">
+        <div class="form-group">
+            <label for="fontSize">Font Size (in points):</label>
+            <input type="number" id="fontSize" value="30">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="data">Data:</label>
+        <input type="text" id="data" placeholder="Enter your data">
+    </div>
+    <div class="form-group">
+        <label for="fileName">File Name:</label>
+        <input type="text" id="fileName" placeholder="Leave empty to use data field as filename">
+    </div>
+    
+
+    <div class="button-group">
+        <button onclick="generateZPL()">Generate ZPL</button>
+        <button onclick="saveToFile()">Save to File</button>
+    </div>
+
+    <textarea id="output" readonly></textarea>
+
+    <script>
+        function toggleOptions() {
+            const contentType = document.getElementById('contentType').value;
+            document.getElementById('barcodeOptions').style.display = 
+                contentType === 'barcode' ? 'block' : 'none';
+            document.getElementById('textOptions').style.display = 
+                contentType === 'text' ? 'block' : 'none';
+        }
+
+        function generateZPL() {
+            const contentType = document.getElementById('contentType').value;
+            const data = document.getElementById('data').value;
+            
+            let zpl = '^XA\n';
+            zpl += '^FO50,50\n'; // Start position
+
+            if (contentType === 'barcode') {
+                const barcodeType = document.getElementById('barcodeType').value;
+                const height = document.getElementById('height').value;
+                const width = document.getElementById('width').value;
+
+                switch(barcodeType) {
+                    case 'aztec':
+                        zpl += `^B0N,${height},${width}\n^FD${data}^FS\n`;
+                        break;
+                    case 'code128':
+                        zpl += `^BCN,${height},Y,N,N\n^FD${data}^FS\n`;
+                        break;
+                    case 'datamatrix':
+                        zpl += `^BXN,${height},200\n^FD${data}^FS\n`;
+                        break;
+                }
+            } else {
+                // Text only
+                const fontSize = document.getElementById('fontSize').value;
+                zpl += `^A0N,${fontSize},${fontSize}\n^FD${data}^FS\n`;
+            }
+
+            zpl += '^XZ';
+            
+            document.getElementById('output').value = zpl;
+        }
+
+       function saveToFile() {
+           const zplContent = document.getElementById('output').value;
+           if (!zplContent) {
+               alert('Please generate ZPL code first!');
+               return;
+           }
+       
+           const fileNameInput = document.getElementById('fileName').value;
+           const dataContent = document.getElementById('data').value;
+           
+           // Use custom filename if provided, otherwise use data field content
+           let fileName = fileNameInput.trim() || dataContent.trim();
+           
+           // Sanitize the filename by removing invalid characters
+           fileName = fileName.replace(/[^a-z0-9]/gi, '_');
+           
+           // Add .zpl extension if it doesn't exist
+           if (!fileName.toLowerCase().endsWith('.zpl')) {
+               fileName += '.zpl';
+           }
+       
+           const blob = new Blob([zplContent], { type: 'text/plain' });
+           const url = window.URL.createObjectURL(blob);
+           const a = document.createElement('a');
+           a.href = url;
+           a.download = fileName;
+           document.body.appendChild(a);
+           a.click();
+           window.URL.revokeObjectURL(url);
+           document.body.removeChild(a);
+       }
+       
+    </script>
+</body>
+</html>
