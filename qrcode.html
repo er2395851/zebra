@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>QR Code Scanner</title>
+    <title>QR Code Scanner & Barcode Generator</title>
     <style>
         .scanner-container {
             width: 100%;
@@ -19,20 +19,46 @@
             background-color: #f0f0f0;
             border: 1px solid #ddd;
         }
+        #barcodeContainer {
+            margin-top: 20px;
+            text-align: center;
+        }
     </style>
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
     <div class="scanner-container">
-        <h1>QR Code Scanner</h1>
+        <h1>QR Code Scanner & Barcode Generator</h1>
         <div id="reader"></div>
         <div id="result"></div>
+        <div id="barcodeContainer">
+            <svg id="barcode"></svg>
+        </div>
     </div>
 
     <script>
         function onScanSuccess(decodedText, decodedResult) {
             document.getElementById('result').innerHTML = 
                 `<p><strong>Scanned Data:</strong> ${decodedText}</p>`;
+            
+            // Generate barcode from the scanned QR code data
+            generateBarcode(decodedText);
+        }
+
+        function generateBarcode(data) {
+            try {
+                JsBarcode("#barcode", data, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 100,
+                    displayValue: true
+                });
+            } catch (error) {
+                console.error("Error generating barcode:", error);
+                document.getElementById('barcodeContainer').innerHTML += 
+                    `<p style="color: red;">Error generating barcode: ${error.message}</p>`;
+            }
         }
 
         function onScanError(errorMessage) {
@@ -48,7 +74,6 @@
                 useBarCodeDetectorIfSupported: true
             },
             rememberLastUsedCamera: true,
-            // Specify back camera
             facingMode: "environment"
         };
 
