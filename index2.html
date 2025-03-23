@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZPL Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #preview {
+            width: 100%;
+            height: 200px;
+            margin-top: 20px;
+            font-family: monospace;
+        }
+
+        .options {
+            display: none;
+        }
+
+        .options.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ZPL Generator</h1>
+        
+        <div class="form-group">
+            <label for="elementType">Element Type:</label>
+            <select id="elementType" onchange="toggleOptions()">
+                <option value="text">Text</option>
+                <option value="aztec">Aztec Code</option>
+            </select>
+        </div>
+
+        <!-- Text Options -->
+        <div id="textOptions" class="options active">
+            <div class="form-group">
+                <label for="text">Text Content:</label>
+                <input type="text" id="text" placeholder="Enter text">
+            </div>
+            <div class="form-group">
+                <label for="fontSize">Font Size:</label>
+                <select id="fontSize">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="rotation">Rotation:</label>
+                <select id="rotation">
+                    <option value="N">Normal</option>
+                    <option value="R">Rotate 90°</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Aztec Options -->
+        <div id="aztecOptions" class="options">
+            <div class="form-group">
+                <label for="aztecData">Aztec Data:</label>
+                <input type="text" id="aztecData" placeholder="Enter data for Aztec code">
+            </div>
+            <div class="form-group">
+                <label for="aztecSize">Size:</label>
+                <input type="number" id="aztecSize" value="10" min="1" max="100">
+            </div>
+        </div>
+
+        <!-- Common Options -->
+        <div class="form-group">
+            <label for="xPosition">X Position (dots):</label>
+            <input type="number" id="xPosition" value="50" min="0">
+        </div>
+        <div class="form-group">
+            <label for="yPosition">Y Position (dots):</label>
+            <input type="number" id="yPosition" value="50" min="0">
+        </div>
+        <div class="form-group">
+            <label for="copies">Number of Copies:</label>
+            <input type="number" id="copies" value="1" min="1">
+        </div>
+        <div class="form-group">
+            <label for="filename">File Name (optional):</label>
+            <input type="text" id="filename" placeholder="Enter file name or leave blank for date">
+        </div>
+
+        <button onclick="generateZPL()">Generate ZPL</button>
+        <button onclick="downloadZPL()">Download ZPL</button>
+
+        <textarea id="preview" readonly></textarea>
+    </div>
+
+    <script>
+        function toggleOptions() {
+            const elementType = document.getElementById('elementType').value;
+            document.getElementById('textOptions').classList.toggle('active', elementType === 'text');
+            document.getElementById('aztecOptions').classList.toggle('active', elementType === 'aztec');
+        }
+
+        function generateZPL() {
+            const elementType = document.getElementById('elementType').value;
+            const xPos = document.getElementById('xPosition').value;
+            const yPos = document.getElementById('yPosition').value;
+            const copies = document.getElementById('copies').value;
+            let zpl = '^XA\n';
+
+            if (elementType === 'text') {
+                const text = document.getElementById('text').value;
+                const fontSize = document.getElementById('fontSize').value;
+                const rotation = document.getElementById('rotation').value;
+                
+                zpl += `^FO${xPos},${yPos}`;
+                zpl += `^A0${fontSize},${rotation}`;
+                zpl += `^FD${text}^FS\n`;
+            } else {
+                const aztecData = document.getElementById('aztecData').value;
+                const aztecSize = document.getElementById('aztecSize').value;
+                
+                zpl += `^FO${xPos},${yPos}`;
+                zpl += `^BON,${aztecSize},N`;
+                zpl += `^FD${aztecData}^FS\n`;
+            }
+
+            zpl += `^PQ${copies}\n`;
+            zpl += '^XZ';
+
+            document.getElementById('preview').value = zpl;
+        }
+
+        function downloadZPL() {
+            const zpl = document.getElementById('preview').value;
+            if (!zpl) {
+                alert('Please generate ZPL code first');
+                return;
+            }
+
+            let filename = document.getElementById('filename').value;
+            if (!filename) {
+                const now = new Date();
+                filename = now.toISOString().replace(/[:.]/g, '-');
+            }
+            
+            if (!filename.endsWith('.zpl')) {
+                filename += '.zpl';
+            }
+
+            const blob = new Blob([zpl], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>
